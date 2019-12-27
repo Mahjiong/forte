@@ -22,6 +22,7 @@ from forte.pipeline import Pipeline
 from forte.common.evaluation import Evaluator
 from forte.common.resources import Resources
 from forte.data.readers import BaseReader
+from forte.data import DataPack
 from forte.processors.base import BaseProcessor
 from forte.trainer.base import BaseTrainer
 
@@ -51,11 +52,9 @@ class TrainPipeline:
         self.dev_reader = dev_reader
         self.trainer = trainer
 
-        if predictor is not None:
-            self.predictor = predictor
+        self.predictor = predictor
 
-        if evaluator is not None:
-            self.evaluator = evaluator
+        self.evaluator = evaluator
 
     def run(self):
         logging.info("Preparing the pipeline")
@@ -79,19 +78,24 @@ class TrainPipeline:
         for p in self.preprocessors:
             prepare_pl.add_processor(p)
 
-        prepare_pl.run(self.configs.config_data.train_path)
+        # prepare_pl.run(self.configs.config_data.train_path)
 
         for p in self.preprocessors:
             p.finish(resource=self.resource)
 
     def train(self):
+        self.trainer.train()
         epoch = 0
         while True:
             epoch += 1
             for pack in self.train_reader.iter(
                     self.configs.config_data.train_path):
-                for instance in pack.get_data(**self.trainer.data_request()):
-                    self.trainer.consume(instance)
+                if isinstance(pack, DataPack):
+                    for instance in pack.get_data(
+                            **self.trainer.data_request()):
+                        self.trainer.consume(instance)
+                else:
+                    self.trainer.consume(pack)
 
             self.trainer.epoch_finish_action(epoch)
 
@@ -127,6 +131,10 @@ class TrainPipeline:
 
     def finish(self):
         self.train_reader.finish(self.resource)
-        self.dev_reader.finish(self.resource)
         self.trainer.finish(self.resource)
-        self.predictor.finish(self.resource)
+
+        if self.dev_reader:
+            self.dev_reader.finish(self.resource)
+
+        if self.predictor:
+            self.predictor.finish(self.resource)

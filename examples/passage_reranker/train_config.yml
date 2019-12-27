@@ -1,0 +1,8 @@
+config_data:
+  train_path: "train_triples/triples.train.small.tsv"
+
+query_pack: "query"
+positive_pack: "positive_passage"
+negative_pack: "negative_passage"
+batch_size: 4
+num_classes: 2
